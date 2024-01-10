@@ -1,4 +1,4 @@
-import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnOutput, Tags } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as elbv2_tg from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets'
@@ -31,24 +31,6 @@ export class CdkStack extends Stack {
       restrictDefaultSecurityGroup: true
     });
 
-    // add private endpoints for session manager
-    vpc.addInterfaceEndpoint('SsmEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM,
-    });
-    vpc.addInterfaceEndpoint('SsmMessagesEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
-    });
-    vpc.addInterfaceEndpoint('Ec2MessagesEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
-    });
-    // add private endpoint for Amazon Linux repository on s3
-    vpc.addGatewayEndpoint('S3Endpoint', {
-      service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [
-        { subnetType: ec2.SubnetType.PRIVATE_ISOLATED }
-      ]
-    });
-
     //
     // security groups
     //
@@ -66,51 +48,26 @@ export class CdkStack extends Stack {
     })
     ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(80), 'allow http traffic from alb')
 
-    //
-    // web servers
-    //
-    const userData = ec2.UserData.forLinux({
-      shebang: '#!/bin/bash',
+    const ec2Instance = new ec2.Instance(this, 'WebEc2', {
+      instanceName: 'web-ec2',
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MICRO),
+      machineImage: ec2.MachineImage.latestAmazonLinux2023(),
+      vpc,
+      vpcSubnets: vpc.selectSubnets({
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+      }),
+      securityGroup: ec2Sg,
+      blockDevices: [
+        {
+          deviceName: '/dev/xvda',
+          volume: ec2.BlockDeviceVolume.ebs(8, {
+            encrypted: true
+          }),
+        },
+      ],
+      ssmSessionPermissions: true,
+      propagateTagsToVolumeOnCreation: true,
     })
-    userData.addCommands(
-      // setup httpd
-      'yum update -y',
-      'yum install -y httpd',
-      'systemctl start httpd',
-      'systemctl enable httpd',
-      'echo "This is a sample website." > /var/www/html/index.html',
-    )
-
-    // launch one instance per az
-    const targets: elbv2_tg.InstanceTarget[] = new Array();
-    for (const [idx, az] of vpc.availabilityZones.entries()) {
-      targets.push(
-        new elbv2_tg.InstanceTarget(
-          new ec2.Instance(this, `WebEc2${idx + 1}`, {
-            instanceName: `web-ec2-${idx + 1}`,   // web-ec2-1, web-ec2-2, ...
-            instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MICRO),
-            machineImage: ec2.MachineImage.latestAmazonLinux2023(),
-            vpc,
-            vpcSubnets: vpc.selectSubnets({
-              subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-            }),
-            availabilityZone: az,
-            securityGroup: ec2Sg,
-            blockDevices: [
-              {
-                deviceName: '/dev/xvda',
-                volume: ec2.BlockDeviceVolume.ebs(8, {
-                  encrypted: true
-                }),
-              },
-            ],
-            userData,
-            ssmSessionPermissions: true,
-            propagateTagsToVolumeOnCreation: true,
-          })
-        )
-      );
-    }
 
     //
     // alb
@@ -128,6 +85,10 @@ export class CdkStack extends Stack {
       port: 80,
       protocol: elbv2.ApplicationProtocol.HTTP
     })
+    const targets = new Array();
+    targets.push(
+      new elbv2_tg.InstanceTarget(ec2Instance)
+    )
     listener.addTargets('WebEc2Target', {
       targets,
       port: 80
@@ -137,24 +98,27 @@ export class CdkStack extends Stack {
       value: `curl http://${alb.loadBalancerDnsName}`
     })
 
+    const albName = alb.loadBalancerName
+    const ec2Name = ec2Instance.instanceId
+    const ec2Refs = albName
+
     const drawioCsv: string = `
 ## Simple web server AWS diagram
 # label: %component%
 # style: shape=%shape%;fillColor=%fill%;strokeColor=%stroke%;verticalLabelPosition=bottom;
 # namespace: csvimport-
-# connect: {"from":"refs", "to":"id", "invert":true, "style":"curved=0;endArrow=none;endFill=0;dashed=1;strokeColor=#6c8ebf;"}
+# connect: {"from":"refs", "to":"component", "invert":true, "style":"curved=0;endArrow=block;endFill=0;dashed=1;strokeColor=#6c8ebf;"}
 # width: 80
 # height: 80
-# ignore: id,shape,fill,stroke,refs
+# ignore: refs
 # nodespacing: 40
 # levelspacing: 40
 # edgespacing: 40
 # layout: horizontaltree
 ## CSV data starts below this line
-id,component,fill,stroke,shape,refs
-1,ALB,#8C4FFF,#ffffff,mxgraph.aws4.application_load_balancer,
-2,EC2-1,#ED7100,#ffffff,mxgraph.aws4.ec2,1
-3,EC2-2,#ED7100,#ffffff,mxgraph.aws4.ec2,1
+component,fill,stroke,shape,refs
+${albName},#8C4FFF,#ffffff,mxgraph.aws4.application_load_balancer,
+${ec2Name},#ED7100,#ffffff,mxgraph.aws4.ec2,${ec2Refs}
 `
     new CfnOutput(this, 'DrawioCsv', {
       value: drawioCsv
