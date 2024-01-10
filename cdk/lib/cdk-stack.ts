@@ -98,9 +98,20 @@ export class CdkStack extends Stack {
       value: `curl http://${alb.loadBalancerDnsName}`
     })
 
-    const albName = alb.loadBalancerName
-    const ec2Name = ec2Instance.instanceId
-    const ec2Refs = albName
+    //
+    // draw.io csv
+    //
+    const resources: AwsResource[] = [];
+
+    // EC2インスタンスとALBのインスタンスを作成
+    const ec2Model = new Ec2Instance(ec2Instance.instanceId);
+    const albModel = new ApplicationLoadBalancer(alb.loadBalancerName);
+
+    // 依存関係の設定
+    ec2Model.addRef(albModel.name);
+
+    // リソースリストに追加
+    resources.push(ec2Model, albModel);
 
     const drawioCsv: string = `
 ## Simple web server AWS diagram
@@ -117,11 +128,47 @@ export class CdkStack extends Stack {
 # layout: horizontaltree
 ## CSV data starts below this line
 component,fill,stroke,shape,refs
-${albName},#8C4FFF,#ffffff,mxgraph.aws4.application_load_balancer,
-${ec2Name},#ED7100,#ffffff,mxgraph.aws4.ec2,${ec2Refs}
+${resources.map(resource => resource.toCsvLine()).join('\n')}
 `
     new CfnOutput(this, 'DrawioCsv', {
       value: drawioCsv
     })
+  }
+}
+
+class AwsResource {
+  name: string;
+  fill: string;
+  stroke: string;
+  shape: string;
+  refs: string[];
+
+  constructor(name: string, fill: string, stroke: string, shape: string) {
+    this.name = name;
+    this.fill = fill;
+    this.stroke = stroke;
+    this.shape = shape;
+    this.refs = [];
+  }
+
+  addRef(ref: string) {
+    this.refs.push(ref);
+  }
+
+  toCsvLine(): string {
+    const refsString = this.refs.join(',');
+    return `${this.name},${this.fill},${this.stroke},${this.shape},${refsString}`;
+  }
+}
+
+class Ec2Instance extends AwsResource {
+  constructor(name: string) {
+    super(name, '#ED7100', '#ffffff', 'mxgraph.aws4.ec2');
+  }
+}
+
+class ApplicationLoadBalancer extends AwsResource {
+  constructor(name: string) {
+    super(name, '#8C4FFF', '#ffffff', 'mxgraph.aws4.application_load_balancer');
   }
 }
