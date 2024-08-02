@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile modified="2024-04-05T23:18:28.540Z" host="Electron" agent="5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/20.7.4 Chrome/106.0.5249.199 Electron/21.3.3 Safari/537.36" etag="2PIsvQ1qapzhzomwvmCY" version="20.7.4" type="device">
+  <diagram id="VDQkjflET5rUmYBQovEA" name="ページ2">
+    <mxGraphModel dx="2074" dy="1247" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject label="%component%" component="ALB" placeholders="1" id="_UURGmZ6SpFd7tP_iFJC-1">
+          <mxCell style="shape=mxgraph.aws4.application_load_balancer;fillColor=#8C4FFF;strokeColor=#ffffff;verticalLabelPosition=bottom;fontSize=16;" vertex="1" parent="1">
+            <mxGeometry x="20" y="20" width="80" height="80" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="%component%" component="EC2" placeholders="1" id="_UURGmZ6SpFd7tP_iFJC-2">
+          <mxCell style="shape=mxgraph.aws4.ec2;fillColor=#ED7100;strokeColor=#ffffff;verticalLabelPosition=bottom;fontSize=16;" vertex="1" parent="1">
+            <mxGeometry x="160" y="20" width="80" height="80" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="_UURGmZ6SpFd7tP_iFJC-3" value="" style="curved=0;endArrow=none;endFill=0;dashed=1;strokeColor=#6c8ebf;" edge="1" parent="1" source="_UURGmZ6SpFd7tP_iFJC-1" target="_UURGmZ6SpFd7tP_iFJC-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
